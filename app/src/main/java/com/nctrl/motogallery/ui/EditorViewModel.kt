@@ -30,6 +30,16 @@ data class EditorUiState(
 
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
+    private companion object {
+        /** Retoque suave: un poco de luz, contraste y color. */
+        val AUTO_ENHANCE = EditState(
+            brightness = 0.07f,
+            contrast = 1.12f,
+            saturation = 1.18f,
+            warmth = 0.08f,
+        )
+    }
+
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
 
@@ -37,7 +47,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private var original: Bitmap? = null
     private var loadedUri: Uri? = null
 
-    fun load(uri: Uri) {
+    fun load(uri: Uri, enhance: Boolean = false) {
         if (loadedUri == uri) return
         loadedUri = uri
 
@@ -46,7 +56,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             val bitmap = ImageEditing.loadPreview(getApplication(), uri)
             original = bitmap
             _state.update {
-                it.copy(loading = false, preview = bitmap, failed = bitmap == null)
+                it.copy(
+                    loading = false,
+                    preview = bitmap,
+                    failed = bitmap == null,
+                    // "Mejorar" entra con los ajustes ya puestos, listos para
+                    // retocar o guardar directamente.
+                    edit = if (enhance) AUTO_ENHANCE else it.edit,
+                )
             }
         }
     }

@@ -77,15 +77,16 @@ private enum class Tool { CROP, FILTERS, ADJUST }
 fun EditorScreen(
     uri: Uri,
     sourceName: String,
+    enhance: Boolean,
     viewModel: EditorViewModel,
     onClose: () -> Unit,
     onSaved: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var tool by remember { mutableStateOf(Tool.CROP) }
+    var tool by remember { mutableStateOf(if (enhance) Tool.ADJUST else Tool.CROP) }
     var confirmDiscard by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uri) { viewModel.load(uri) }
+    LaunchedEffect(uri) { viewModel.load(uri, enhance) }
 
     fun close() {
         if (state.edit.hasChanges) confirmDiscard = true else onClose()

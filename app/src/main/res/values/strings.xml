@@ -45,6 +45,7 @@
     <string name="action_use_as">Usar como</string>
     <string name="action_rotate_left">Girar a la izquierda</string>
     <string name="action_edit">Editar</string>
+    <string name="action_enhance">Mejorar</string>
     <string name="action_save">Guardar</string>
     <string name="action_reset">Restablecer</string>
     <string name="action_rotate">Girar</string>

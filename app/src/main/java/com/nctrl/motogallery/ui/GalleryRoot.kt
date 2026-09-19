@@ -77,7 +77,7 @@ private object Routes {
     const val FAVORITES = "favorites"
     const val SEARCH = "search"
     const val TRASH = "trash"
-    const val EDITOR = "edit/{uri}"
+    const val EDITOR = "edit/{uri}?enhance={enhance}"
     const val ALBUM_DETAIL = "album/{albumId}"
     const val PLACE_DETAIL = "place/{place}"
     const val VIEWER = "viewer/{source}/{index}"
@@ -85,7 +85,8 @@ private object Routes {
     fun album(albumId: Long) = "album/$albumId"
     fun place(name: String) = "place/${Uri.encode(name)}"
     fun viewer(source: String, index: Int) = "viewer/${Uri.encode(source)}/$index"
-    fun editor(uri: Uri) = "edit/${Uri.encode(uri.toString())}"
+    fun editor(uri: Uri, enhance: Boolean = false) =
+        "edit/${Uri.encode(uri.toString())}?enhance=$enhance"
 }
 
 private data class Tab(val route: String, val labelRes: Int, val icon: ImageVector)
@@ -324,9 +325,16 @@ private fun GalleryNavigation(
 
             composable(
                 route = Routes.EDITOR,
-                arguments = listOf(navArgument("uri") { type = NavType.StringType }),
+                arguments = listOf(
+                    navArgument("uri") { type = NavType.StringType },
+                    navArgument("enhance") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
             ) { entry ->
                 val raw = entry.arguments?.getString("uri").orEmpty()
+                val enhance = entry.arguments?.getBoolean("enhance") ?: false
                 val uri = remember(raw) { Uri.parse(raw) }
                 val name = remember(raw, state.items) {
                     state.items.firstOrNull { it.uri.toString() == raw }?.name ?: "IMG"
@@ -337,6 +345,7 @@ private fun GalleryNavigation(
                 EditorScreen(
                     uri = uri,
                     sourceName = name,
+                    enhance = enhance,
                     viewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
                     onClose = { navController.popBackStack() },
                     onSaved = {
@@ -394,6 +403,13 @@ private fun GalleryNavigation(
                         null
                     } else {
                         { item -> navController.navigate(Routes.editor(item.uri)) }
+                    },
+                    onEnhance = if (source == "trash") {
+                        null
+                    } else {
+                        { item ->
+                            navController.navigate(Routes.editor(item.uri, enhance = true))
+                        }
                     },
                 )
             }
