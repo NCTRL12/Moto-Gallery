@@ -49,3 +49,10 @@ fun dayKey(millis: Long): Long {
     calendar.timeInMillis = millis
     return calendar.get(Calendar.YEAR) * 1000L + calendar.get(Calendar.DAY_OF_YEAR)
 }
+
+/** Días que faltan para que Android borre solo un elemento de la papelera. */
+fun daysUntil(epochSeconds: Long): Int {
+    if (epochSeconds <= 0) return 0
+    val remaining = epochSeconds * 1000L - System.currentTimeMillis()
+    return if (remaining <= 0) 0 else TimeUnit.MILLISECONDS.toDays(remaining).toInt() + 1
+}

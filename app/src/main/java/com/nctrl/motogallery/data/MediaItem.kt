@@ -16,6 +16,8 @@ data class MediaItem(
     val durationMs: Long,
     val bucketId: Long,
     val bucketName: String,
+    /** Solo en la papelera: segundos epoch en los que Android lo borrará solo. */
+    val expiresAt: Long = 0,
 ) {
     val isVideo: Boolean get() = durationMs > 0 || mimeType.startsWith("video/")
 

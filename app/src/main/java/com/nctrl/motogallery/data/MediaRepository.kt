@@ -6,6 +6,7 @@ import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -22,8 +23,21 @@ class MediaRepository(private val context: Context) {
 
     suspend fun loadAll(): List<MediaItem> = withContext(Dispatchers.IO) {
         val items = ArrayList<MediaItem>(512)
-        items += query(imagesUri(), isVideo = false)
-        items += query(videosUri(), isVideo = true)
+        items += query(imagesUri(), isVideo = false, trashed = false)
+        items += query(videosUri(), isVideo = true, trashed = false)
+        items.sortByDescending { it.dateTaken }
+        items
+    }
+
+    /**
+     * Contenido de la papelera del sistema. Android solo la tiene desde la
+     * versión 11; por debajo no hay nada que listar porque borrar es definitivo.
+     */
+    suspend fun loadTrashed(): List<MediaItem> = withContext(Dispatchers.IO) {
+        if (!trashSupported) return@withContext emptyList()
+        val items = ArrayList<MediaItem>(64)
+        items += query(imagesUri(), isVideo = false, trashed = true)
+        items += query(videosUri(), isVideo = true, trashed = true)
         items.sortByDescending { it.dateTaken }
         items
     }
@@ -42,7 +56,7 @@ class MediaRepository(private val context: Context) {
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         }
 
-    private fun query(collection: Uri, isVideo: Boolean): List<MediaItem> {
+    private fun query(collection: Uri, isVideo: Boolean, trashed: Boolean): List<MediaItem> {
         // Los nombres de columna van como literales porque las constantes de
         // MediaStore.MediaColumns para bucket/duración solo existen en API 29+.
         val projection = buildList {
@@ -57,11 +71,24 @@ class MediaRepository(private val context: Context) {
             add(COLUMN_BUCKET_ID)
             add(COLUMN_BUCKET_NAME)
             if (isVideo) add(COLUMN_DURATION)
+            if (trashed) add(COLUMN_DATE_EXPIRES)
         }.toTypedArray()
 
         val result = ArrayList<MediaItem>()
         val cursor = runCatching {
-            resolver.query(collection, projection, null, null, "${MediaStore.MediaColumns.DATE_MODIFIED} DESC")
+            if (trashed) {
+                // La papelera se pide con argumentos en Bundle: no hay forma de
+                // expresar "solo lo descartado" con un WHERE normal.
+                resolver.query(collection, projection, trashQueryArgs(), null)
+            } else {
+                resolver.query(
+                    collection,
+                    projection,
+                    null,
+                    null,
+                    "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
+                )
+            }
         }.getOrNull() ?: return result
 
         cursor.use { c ->
@@ -76,6 +103,7 @@ class MediaRepository(private val context: Context) {
             val bucketIdCol = c.getColumnIndex(COLUMN_BUCKET_ID)
             val bucketNameCol = c.getColumnIndex(COLUMN_BUCKET_NAME)
             val durationCol = c.getColumnIndex(COLUMN_DURATION)
+            val expiresCol = c.getColumnIndex(COLUMN_DATE_EXPIRES)
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
@@ -97,6 +125,8 @@ class MediaRepository(private val context: Context) {
                     bucketId = bucketIdCol.takeIf { it >= 0 }?.let { c.getLong(it) } ?: 0L,
                     bucketName = bucketNameCol.takeIf { it >= 0 }?.let { c.getString(it) }
                         ?: UNKNOWN_ALBUM,
+                    expiresAt = expiresCol.takeIf { it >= 0 && !c.isNull(it) }
+                        ?.let { c.getLong(it) } ?: 0L,
                 )
             }
         }
@@ -117,12 +147,26 @@ class MediaRepository(private val context: Context) {
         runCatching { resolver.unregisterContentObserver(observer) }
     }
 
+    private fun trashQueryArgs(): Bundle = Bundle().apply {
+        putString(
+            ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
+            "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
+        }
+    }
+
     companion object {
+        /** La papelera del MediaStore existe desde Android 11. */
+        val trashSupported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
         const val UNKNOWN_ALBUM = "Otros"
         private const val COLUMN_BUCKET_ID = "bucket_id"
         private const val COLUMN_BUCKET_NAME = "bucket_display_name"
         private const val COLUMN_DATE_TAKEN = "datetaken"
         private const val COLUMN_DURATION = "duration"
+        private const val COLUMN_DATE_EXPIRES = "date_expires"
     }
 }
 

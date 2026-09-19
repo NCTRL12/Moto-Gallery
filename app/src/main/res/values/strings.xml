@@ -56,9 +56,20 @@
     <string name="details_path">Álbum</string>
     <string name="details_place">Ubicación</string>
 
-    <string name="delete_confirm_title">¿Eliminar?</string>
-    <string name="delete_confirm_one">Este elemento se enviará a la papelera del teléfono.</string>
-    <string name="deleted_toast">Elemento eliminado</string>
+    <string name="tab_trash">Papelera</string>
+    <string name="trash_empty">La papelera está vacía</string>
+    <string name="trash_unsupported">Tu versión de Android no tiene papelera: al eliminar, se borra directamente.</string>
+    <string name="trash_hint">Android borra solo lo que lleve 30 días aquí</string>
+    <string name="trash_expires">Quedan %1$d días</string>
+    <string name="trash_expires_today">Se borra hoy</string>
+    <string name="action_empty_trash">Vaciar papelera</string>
+    <string name="action_restore">Restaurar</string>
+    <string name="action_delete_forever">Eliminar definitivamente</string>
+    <string name="empty_trash_confirm_title">¿Vaciar la papelera?</string>
+    <string name="empty_trash_confirm_body">Se borrarán %1$d elementos para siempre. No se pueden recuperar.</string>
+    <string name="deleted_toast">Eliminado definitivamente</string>
+    <string name="trashed_toast">Movido a la papelera</string>
+    <string name="restored_toast">Restaurado</string>
     <string name="delete_failed">No se pudo eliminar</string>
 
     <string name="selection_count">%1$d seleccionados</string>

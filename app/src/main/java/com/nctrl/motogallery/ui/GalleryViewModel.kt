@@ -14,6 +14,7 @@ import com.nctrl.motogallery.data.SearchSuggestion
 import com.nctrl.motogallery.data.toAlbums
 import com.nctrl.motogallery.util.MediaAccess
 import com.nctrl.motogallery.util.Permissions
+import com.nctrl.motogallery.util.TrashOperation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,7 +40,11 @@ data class GalleryUiState(
     val placeGroups: List<Place> = emptyList(),
     val indexingPlaces: Boolean = false,
     val filter: MediaFilter = MediaFilter.ALL,
+    /** Contenido de la papelera del sistema (Android 11+). */
+    val trashed: List<MediaItem> = emptyList(),
 ) {
+    val trashSupported: Boolean get() = MediaRepository.trashSupported
+
     // lazy: se calcula una vez por estado, no en cada recomposición.
     val favorites: List<MediaItem> by lazy { items.filter { it.key in favoriteKeys } }
 
@@ -124,7 +129,17 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
             }
 
             rebuildIndex()
+            refreshTrash()
             indexPlaces(items)
+        }
+    }
+
+    /** La papelera se consulta aparte: no forma parte de la galería normal. */
+    fun refreshTrash() {
+        if (!MediaRepository.trashSupported) return
+        viewModelScope.launch {
+            val trashed = repository.loadTrashed()
+            _state.update { it.copy(trashed = trashed) }
         }
     }
 
@@ -236,20 +251,43 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
             itemsForAlbum(source.removePrefix("album-").toLongOrNull() ?: 0L)
 
         source.startsWith("place-") -> itemsForPlace(source.removePrefix("place-"))
+        source == "trash" -> _state.value.trashed
         else -> _state.value.filtered
     }
 
-    /** Quita lo borrado al momento para que la rejilla no espere al sistema. */
-    fun onDeleted(deleted: List<MediaItem>) {
-        val deletedKeys = deleted.map { it.key }.toSet()
+    /**
+     * Refleja al momento lo que acaba de pasar para que la rejilla no tenga que
+     * esperar a que el sistema avise, y luego recarga de verdad.
+     */
+    fun onMediaChanged(affected: List<MediaItem>, operation: TrashOperation) {
+        val keys = affected.map { it.key }.toSet()
+
         _state.update { current ->
-            val keys = current.favoriteKeys - deletedKeys
-            favoritesStore.save(keys)
-            current.copy(
-                items = current.items.filterNot { it.key in deletedKeys },
-                favoriteKeys = keys,
-            )
+            when (operation) {
+                // Sale de la galería y entra en la papelera.
+                TrashOperation.TRASH -> current.copy(
+                    items = current.items.filterNot { it.key in keys },
+                    trashed = affected + current.trashed,
+                )
+
+                // Vuelve a la galería.
+                TrashOperation.RESTORE -> current.copy(
+                    trashed = current.trashed.filterNot { it.key in keys },
+                )
+
+                // Desaparece de los dos sitios, y de favoritos.
+                TrashOperation.DELETE -> {
+                    val favorites = current.favoriteKeys - keys
+                    favoritesStore.save(favorites)
+                    current.copy(
+                        items = current.items.filterNot { it.key in keys },
+                        trashed = current.trashed.filterNot { it.key in keys },
+                        favoriteKeys = favorites,
+                    )
+                }
+            }
         }
+
         refresh()
     }
 

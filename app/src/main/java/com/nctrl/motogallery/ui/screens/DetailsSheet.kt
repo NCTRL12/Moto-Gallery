@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nctrl.motogallery.R
 import com.nctrl.motogallery.data.MediaItem
+import com.nctrl.motogallery.util.daysUntil
 import com.nctrl.motogallery.util.formatDateTime
 import com.nctrl.motogallery.util.formatDuration
 import com.nctrl.motogallery.util.formatSize
@@ -53,6 +54,17 @@ fun DetailsSheet(item: MediaItem, place: String?, onDismiss: () -> Unit) {
             }
             DetailRow(stringResource(R.string.details_type), item.mimeType)
             DetailRow(stringResource(R.string.details_path), item.bucketName)
+            if (item.expiresAt > 0) {
+                val days = daysUntil(item.expiresAt)
+                DetailRow(
+                    label = stringResource(R.string.tab_trash),
+                    value = if (days <= 0) {
+                        stringResource(R.string.trash_expires_today)
+                    } else {
+                        stringResource(R.string.trash_expires, days)
+                    },
+                )
+            }
         }
     }
 }

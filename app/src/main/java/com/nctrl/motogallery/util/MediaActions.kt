@@ -6,13 +6,15 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
-import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import com.nctrl.motogallery.data.MediaItem
 
-/** Resultado de intentar borrar: o se borró ya, o hace falta que el usuario confirme. */
+/** Qué hacer con los elementos seleccionados. */
+enum class TrashOperation { TRASH, RESTORE, DELETE }
+
+/** Resultado de la operación: o se hizo ya, o hace falta que el usuario confirme. */
 sealed interface DeleteOutcome {
     data object Deleted : DeleteOutcome
     data class NeedsConfirmation(val request: IntentSender) : DeleteOutcome
@@ -56,19 +58,30 @@ object MediaActions {
     }
 
     /**
-     * Borra los elementos. A partir de Android 11 el sistema pide confirmación
-     * con su propio diálogo, así que devolvemos el IntentSender para lanzarlo.
+     * Manda a la papelera, restaura o borra para siempre. Desde Android 11 el
+     * sistema enseña su propio diálogo, así que se devuelve el IntentSender
+     * para que lo lance la pantalla.
      */
-    fun delete(context: Context, items: List<MediaItem>): DeleteOutcome {
+    fun perform(
+        context: Context,
+        items: List<MediaItem>,
+        operation: TrashOperation,
+    ): DeleteOutcome {
         if (items.isEmpty()) return DeleteOutcome.Deleted
         val uris = items.map { it.uri }
         val resolver = context.contentResolver
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return DeleteOutcome.NeedsConfirmation(
-                MediaStore.createDeleteRequest(resolver, uris).intentSender
-            )
+            val request = when (operation) {
+                TrashOperation.TRASH -> MediaStore.createTrashRequest(resolver, uris, true)
+                TrashOperation.RESTORE -> MediaStore.createTrashRequest(resolver, uris, false)
+                TrashOperation.DELETE -> MediaStore.createDeleteRequest(resolver, uris)
+            }
+            return DeleteOutcome.NeedsConfirmation(request.intentSender)
         }
+
+        // Sin papelera del sistema (Android 10 o anterior) borrar es definitivo.
+        if (operation == TrashOperation.RESTORE) return DeleteOutcome.Deleted
 
         return try {
             uris.forEach { resolver.delete(it, null, null) }
@@ -100,7 +113,4 @@ object MediaActions {
         val prefixes = items.map { it.mimeType.substringBefore('/') }.toSet()
         return if (prefixes.size == 1) "${prefixes.first()}/*" else "*/*"
     }
-
-    /** Uri "cruda" para pasar a otras apps sin exponer rutas de archivo. */
-    fun contentUri(item: MediaItem): Uri = item.uri
 }

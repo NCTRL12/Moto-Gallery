@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
@@ -33,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -59,6 +61,7 @@ import com.nctrl.motogallery.ui.screens.MediaGridScreen
 import com.nctrl.motogallery.ui.screens.PermissionScreen
 import com.nctrl.motogallery.ui.screens.PlacesGrid
 import com.nctrl.motogallery.ui.screens.SearchScreen
+import com.nctrl.motogallery.ui.screens.TrashScreen
 import com.nctrl.motogallery.ui.screens.ViewerScreen
 import com.nctrl.motogallery.ui.theme.Motion
 import com.nctrl.motogallery.util.MediaAccess
@@ -70,6 +73,7 @@ private object Routes {
     const val PLACES = "places"
     const val FAVORITES = "favorites"
     const val SEARCH = "search"
+    const val TRASH = "trash"
     const val ALBUM_DETAIL = "album/{albumId}"
     const val PLACE_DETAIL = "place/{place}"
     const val VIEWER = "viewer/{source}/{index}"
@@ -139,7 +143,7 @@ private fun GalleryNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in tabs.map { it.route }
-    val deleteItems = rememberDeleteAction { viewModel.onDeleted(it) }
+    val actions = rememberMediaActions(viewModel::onMediaChanged)
     val searchState by viewModel.search.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -196,7 +200,7 @@ private fun GalleryNavigation(
                     onSelectMorePhotos = onSelectMorePhotos,
                     onSearch = { navController.navigate(Routes.SEARCH) },
                     onOpen = { navController.navigate(Routes.viewer("home", it)) },
-                    onDelete = deleteItems,
+                    onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
                     header = {
                         HomeHeader(
@@ -218,13 +222,23 @@ private fun GalleryNavigation(
                     bottomPadding = bottomPadding,
                     onSearch = { navController.navigate(Routes.SEARCH) },
                     onOpen = { navController.navigate(Routes.viewer("fav", it)) },
-                    onDelete = deleteItems,
+                    onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
                 )
             }
 
             composable(Routes.ALBUMS) {
-                CollectionScaffold(title = stringResource(R.string.tab_albums)) { topPadding ->
+                CollectionScaffold(
+                    title = stringResource(R.string.tab_albums),
+                    action = {
+                        OneUiChip(
+                            label = stringResource(R.string.tab_trash),
+                            selected = false,
+                            onClick = { navController.navigate(Routes.TRASH) },
+                            icon = Icons.Default.Delete,
+                        )
+                    },
+                ) { topPadding ->
                     AlbumsGrid(
                         albums = state.albums,
                         bottomPadding = bottomPadding,
@@ -261,7 +275,7 @@ private fun GalleryNavigation(
                     bottomPadding = bottomPadding,
                     onBack = { navController.popBackStack() },
                     onOpen = { navController.navigate(Routes.viewer("album-$albumId", it)) },
-                    onDelete = deleteItems,
+                    onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
                 )
             }
@@ -283,8 +297,23 @@ private fun GalleryNavigation(
                     bottomPadding = bottomPadding,
                     onBack = { navController.popBackStack() },
                     onOpen = { navController.navigate(Routes.viewer("place-$place", it)) },
-                    onDelete = deleteItems,
+                    onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
+                )
+            }
+
+            composable(Routes.TRASH) {
+                // Se recarga al entrar: se pudo borrar algo desde otra app.
+                LaunchedEffect(Unit) { viewModel.refreshTrash() }
+
+                TrashScreen(
+                    items = state.trashed,
+                    supported = state.trashSupported,
+                    bottomPadding = bottomPadding,
+                    onOpen = { navController.navigate(Routes.viewer("trash", it)) },
+                    onRestore = actions.restore,
+                    onDeleteForever = actions.deleteForever,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -295,7 +324,7 @@ private fun GalleryNavigation(
                     bottomPadding = bottomPadding,
                     onQueryChange = viewModel::onSearchQueryChange,
                     onOpen = { navController.navigate(Routes.viewer("search", it)) },
-                    onDelete = deleteItems,
+                    onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onBack = { navController.popBackStack() },
                 )
@@ -326,7 +355,8 @@ private fun GalleryNavigation(
                     favoriteKeys = state.favoriteKeys,
                     place = { item -> state.places[item.key] },
                     onToggleFavorite = viewModel::toggleFavorite,
-                    onDelete = deleteItems,
+                    // Lo que ya está en la papelera no puede volver a tirarse.
+                    onDelete = if (source == "trash") actions.deleteForever else actions.trash,
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -379,14 +409,23 @@ private fun HomeHeader(
 @Composable
 private fun CollectionScaffold(
     title: String,
+    action: (@Composable () -> Unit)? = null,
     content: @Composable (topPadding: Dp) -> Unit,
 ) {
     Column(modifier = Modifier.statusBarsPadding()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.weight(1f),
+            )
+            action?.invoke()
+        }
         content(8.dp)
     }
 }
