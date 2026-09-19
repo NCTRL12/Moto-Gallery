@@ -5,6 +5,22 @@
     <string name="tab_photos">Fotos</string>
     <string name="tab_albums">Álbumes</string>
     <string name="tab_favorites">Favoritos</string>
+    <string name="tab_places">Lugares</string>
+
+    <string name="action_search">Buscar</string>
+    <string name="search_hint">Buscar fotos, lugares, fechas…</string>
+    <string name="search_empty">Sin resultados para «%1$s»</string>
+    <string name="search_suggestions">Sugerencias</string>
+    <string name="search_results">%1$d resultados</string>
+
+    <string name="places_indexing">Buscando ubicaciones en tus fotos…</string>
+    <string name="empty_places">Ninguna foto guarda todavía su ubicación</string>
+    <string name="places_hint">Se lee del propio archivo, sin conexión a internet</string>
+
+    <string name="filter_all">Todo</string>
+    <string name="filter_photos">Fotos</string>
+    <string name="filter_videos">Vídeos</string>
+    <string name="filter_favorites">Favoritos</string>
 
     <string name="permission_title">Necesitamos ver tus fotos</string>
     <string name="permission_body">Para mostrar tu galería, la app necesita permiso para leer las fotos y vídeos guardados en el teléfono. No se envía nada a internet.</string>
@@ -38,6 +54,7 @@
     <string name="details_duration">Duración</string>
     <string name="details_type">Tipo</string>
     <string name="details_path">Álbum</string>
+    <string name="details_place">Ubicación</string>
 
     <string name="delete_confirm_title">¿Eliminar?</string>
     <string name="delete_confirm_one">Este elemento se enviará a la papelera del teléfono.</string>

@@ -23,7 +23,7 @@ import com.nctrl.motogallery.util.formatSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsSheet(item: MediaItem, onDismiss: () -> Unit) {
+fun DetailsSheet(item: MediaItem, place: String?, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -41,6 +41,9 @@ fun DetailsSheet(item: MediaItem, onDismiss: () -> Unit) {
             )
             DetailRow(stringResource(R.string.details_name), item.name)
             DetailRow(stringResource(R.string.details_date), formatDateTime(item.dateTaken))
+            if (!place.isNullOrBlank()) {
+                DetailRow(stringResource(R.string.details_place), place)
+            }
             DetailRow(stringResource(R.string.details_size), formatSize(item.size))
             if (item.width > 0 && item.height > 0) {
                 DetailRow(stringResource(R.string.details_dimensions), "${item.width} × ${item.height}")

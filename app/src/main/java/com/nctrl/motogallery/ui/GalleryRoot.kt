@@ -1,22 +1,30 @@
 package com.nctrl.motogallery.ui
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,18 +33,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -45,22 +52,31 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nctrl.motogallery.R
 import com.nctrl.motogallery.data.MediaItem
-import com.nctrl.motogallery.ui.screens.AlbumsScreen
+import com.nctrl.motogallery.ui.components.OneUiChip
+import com.nctrl.motogallery.ui.components.OneUiSearchField
+import com.nctrl.motogallery.ui.screens.AlbumsGrid
 import com.nctrl.motogallery.ui.screens.MediaGridScreen
 import com.nctrl.motogallery.ui.screens.PermissionScreen
+import com.nctrl.motogallery.ui.screens.PlacesGrid
+import com.nctrl.motogallery.ui.screens.SearchScreen
 import com.nctrl.motogallery.ui.screens.ViewerScreen
+import com.nctrl.motogallery.ui.theme.Motion
 import com.nctrl.motogallery.util.MediaAccess
 import com.nctrl.motogallery.util.Permissions
 
 private object Routes {
     const val PHOTOS = "photos"
     const val ALBUMS = "albums"
+    const val PLACES = "places"
     const val FAVORITES = "favorites"
+    const val SEARCH = "search"
     const val ALBUM_DETAIL = "album/{albumId}"
+    const val PLACE_DETAIL = "place/{place}"
     const val VIEWER = "viewer/{source}/{index}"
 
     fun album(albumId: Long) = "album/$albumId"
-    fun viewer(source: String, index: Int) = "viewer/$source/$index"
+    fun place(name: String) = "place/${Uri.encode(name)}"
+    fun viewer(source: String, index: Int) = "viewer/${Uri.encode(source)}/$index"
 }
 
 private data class Tab(val route: String, val labelRes: Int, val icon: ImageVector)
@@ -68,6 +84,7 @@ private data class Tab(val route: String, val labelRes: Int, val icon: ImageVect
 private val tabs = listOf(
     Tab(Routes.PHOTOS, R.string.tab_photos, Icons.Filled.PhotoLibrary),
     Tab(Routes.ALBUMS, R.string.tab_albums, Icons.Outlined.Collections),
+    Tab(Routes.PLACES, R.string.tab_places, Icons.Filled.Place),
     Tab(Routes.FAVORITES, R.string.tab_favorites, Icons.Filled.Favorite),
 )
 
@@ -123,79 +140,110 @@ private fun GalleryNavigation(
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in tabs.map { it.route }
     val deleteItems = rememberDeleteAction { viewModel.onDeleted(it) }
+    val searchState by viewModel.search.collectAsStateWithLifecycle()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp,
+                ) {
                     tabs.forEach { tab ->
-                        val selected = backStackEntry?.destination?.hierarchy
-                            ?.any { it.route == tab.route } == true
                         NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            selected = currentRoute == tab.route,
+                            onClick = { navController.switchTab(tab.route) },
                             icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(stringResource(tab.labelRes)) },
+                            label = {
+                                Text(
+                                    text = stringResource(tab.labelRes),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                indicatorColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 }
             }
         },
     ) { padding ->
+        val bottomPadding = padding.calculateBottomPadding()
+
         NavHost(
             navController = navController,
             startDestination = Routes.PHOTOS,
-            modifier = Modifier,
+            enterTransition = { fadeIn(Motion.quick()) + scaleIn(Motion.soft(), initialScale = 0.97f) },
+            exitTransition = { fadeOut(Motion.quick()) },
+            popEnterTransition = { fadeIn(Motion.quick()) },
+            popExitTransition = { fadeOut(Motion.quick()) + scaleOut(Motion.quick(), targetScale = 0.97f) },
         ) {
             composable(Routes.PHOTOS) {
                 MediaGridScreen(
                     title = stringResource(R.string.app_name),
-                    items = state.items,
+                    items = state.filtered,
                     favoriteKeys = state.favoriteKeys,
                     loading = state.loading,
                     emptyMessage = stringResource(R.string.empty_photos),
+                    bottomPadding = bottomPadding,
                     partialAccess = state.access == MediaAccess.Partial,
-                    scaffoldPadding = padding,
                     onSelectMorePhotos = onSelectMorePhotos,
-                    onRefresh = viewModel::refresh,
-                    onOpen = { index -> navController.navigate(Routes.viewer("all", index)) },
+                    onSearch = { navController.navigate(Routes.SEARCH) },
+                    onOpen = { navController.navigate(Routes.viewer("home", it)) },
                     onDelete = deleteItems,
                     onToggleFavorite = viewModel::toggleFavorite,
+                    header = {
+                        HomeHeader(
+                            filter = state.filter,
+                            onFilterChange = viewModel::setFilter,
+                            onSearchClick = { navController.navigate(Routes.SEARCH) },
+                        )
+                    },
                 )
             }
 
             composable(Routes.FAVORITES) {
-                val favorites = state.favorites
                 MediaGridScreen(
                     title = stringResource(R.string.tab_favorites),
-                    items = favorites,
+                    items = state.favorites,
                     favoriteKeys = state.favoriteKeys,
                     loading = state.loading,
                     emptyMessage = stringResource(R.string.empty_favorites),
-                    partialAccess = false,
-                    scaffoldPadding = padding,
-                    onSelectMorePhotos = onSelectMorePhotos,
-                    onRefresh = viewModel::refresh,
-                    onOpen = { index -> navController.navigate(Routes.viewer("fav", index)) },
+                    bottomPadding = bottomPadding,
+                    onSearch = { navController.navigate(Routes.SEARCH) },
+                    onOpen = { navController.navigate(Routes.viewer("fav", it)) },
                     onDelete = deleteItems,
                     onToggleFavorite = viewModel::toggleFavorite,
                 )
             }
 
             composable(Routes.ALBUMS) {
-                AlbumsScreenContainer(
-                    state = state,
-                    scaffoldPadding = padding,
-                    onAlbumClick = { navController.navigate(Routes.album(it)) },
-                )
+                CollectionScaffold(title = stringResource(R.string.tab_albums)) { topPadding ->
+                    AlbumsGrid(
+                        albums = state.albums,
+                        bottomPadding = bottomPadding,
+                        topPadding = topPadding,
+                        onAlbumClick = { navController.navigate(Routes.album(it.id)) },
+                    )
+                }
+            }
+
+            composable(Routes.PLACES) {
+                CollectionScaffold(title = stringResource(R.string.tab_places)) { topPadding ->
+                    PlacesGrid(
+                        places = state.placeGroups,
+                        indexing = state.indexingPlaces,
+                        bottomPadding = bottomPadding,
+                        topPadding = topPadding,
+                        onPlaceClick = { navController.navigate(Routes.place(it.name)) },
+                    )
+                }
             }
 
             composable(
@@ -210,16 +258,46 @@ private fun GalleryNavigation(
                     favoriteKeys = state.favoriteKeys,
                     loading = state.loading,
                     emptyMessage = stringResource(R.string.empty_photos),
-                    partialAccess = false,
-                    scaffoldPadding = padding,
+                    bottomPadding = bottomPadding,
                     onBack = { navController.popBackStack() },
-                    onSelectMorePhotos = onSelectMorePhotos,
-                    onRefresh = viewModel::refresh,
-                    onOpen = { index ->
-                        navController.navigate(Routes.viewer("album-$albumId", index))
-                    },
+                    onOpen = { navController.navigate(Routes.viewer("album-$albumId", it)) },
                     onDelete = deleteItems,
                     onToggleFavorite = viewModel::toggleFavorite,
+                )
+            }
+
+            composable(
+                route = Routes.PLACE_DETAIL,
+                arguments = listOf(navArgument("place") { type = NavType.StringType }),
+            ) { entry ->
+                val place = entry.arguments?.getString("place").orEmpty()
+                val items = remember(state.items, state.places, place) {
+                    viewModel.itemsForPlace(place)
+                }
+                MediaGridScreen(
+                    title = place,
+                    items = items,
+                    favoriteKeys = state.favoriteKeys,
+                    loading = state.loading,
+                    emptyMessage = stringResource(R.string.empty_photos),
+                    bottomPadding = bottomPadding,
+                    onBack = { navController.popBackStack() },
+                    onOpen = { navController.navigate(Routes.viewer("place-$place", it)) },
+                    onDelete = deleteItems,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                )
+            }
+
+            composable(Routes.SEARCH) {
+                SearchScreen(
+                    state = searchState,
+                    favoriteKeys = state.favoriteKeys,
+                    bottomPadding = bottomPadding,
+                    onQueryChange = viewModel::onSearchQueryChange,
+                    onOpen = { navController.navigate(Routes.viewer("search", it)) },
+                    onDelete = deleteItems,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -229,23 +307,24 @@ private fun GalleryNavigation(
                     navArgument("source") { type = NavType.StringType },
                     navArgument("index") { type = NavType.IntType },
                 ),
+                enterTransition = {
+                    fadeIn(Motion.medium()) + scaleIn(Motion.soft(), initialScale = 0.92f)
+                },
+                popExitTransition = {
+                    fadeOut(Motion.medium()) + scaleOut(Motion.soft(), targetScale = 0.92f)
+                },
             ) { entry ->
-                val source = entry.arguments?.getString("source") ?: "all"
+                val source = entry.arguments?.getString("source") ?: "home"
                 val index = entry.arguments?.getInt("index") ?: 0
-                val items: List<MediaItem> = when {
-                    source == "fav" -> state.favorites
-                    source.startsWith("album-") -> {
-                        val albumId = source.removePrefix("album-").toLongOrNull() ?: 0L
-                        viewModel.itemsForAlbum(albumId)
-                    }
-
-                    else -> state.items
+                val items = remember(source, state.items, state.favoriteKeys, searchState.results) {
+                    viewModel.itemsForSource(source, searchState.results)
                 }
 
                 ViewerScreen(
                     items = items,
                     startIndex = index,
                     favoriteKeys = state.favoriteKeys,
+                    place = { item -> state.places[item.key] },
                     onToggleFavorite = viewModel::toggleFavorite,
                     onDelete = deleteItems,
                     onBack = { navController.popBackStack() },
@@ -255,33 +334,67 @@ private fun GalleryNavigation(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumsScreenContainer(
-    state: GalleryUiState,
-    scaffoldPadding: PaddingValues,
-    onAlbumClick: (Long) -> Unit,
+private fun HomeHeader(
+    filter: MediaFilter,
+    onFilterChange: (MediaFilter) -> Unit,
+    onSearchClick: () -> Unit,
 ) {
-    Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.tab_albums)) }) },
-    ) { innerPadding ->
-        if (state.albums.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Text(
-                    text = stringResource(R.string.empty_albums),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        } else {
-            AlbumsScreen(
-                albums = state.albums,
-                contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = scaffoldPadding.calculateBottomPadding() + 24.dp,
-                ),
-                onAlbumClick = { onAlbumClick(it.id) },
+    Column(modifier = Modifier.padding(horizontal = 10.dp)) {
+        OneUiSearchField(
+            placeholder = stringResource(R.string.search_hint),
+            onClick = onSearchClick,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 2.dp),
+        ) {
+            OneUiChip(
+                label = stringResource(R.string.filter_all),
+                selected = filter == MediaFilter.ALL,
+                onClick = { onFilterChange(MediaFilter.ALL) },
+            )
+            OneUiChip(
+                label = stringResource(R.string.filter_photos),
+                selected = filter == MediaFilter.PHOTOS,
+                onClick = { onFilterChange(MediaFilter.PHOTOS) },
+            )
+            OneUiChip(
+                label = stringResource(R.string.filter_videos),
+                selected = filter == MediaFilter.VIDEOS,
+                onClick = { onFilterChange(MediaFilter.VIDEOS) },
+            )
+            OneUiChip(
+                label = stringResource(R.string.filter_favorites),
+                selected = filter == MediaFilter.FAVORITES,
+                onClick = { onFilterChange(MediaFilter.FAVORITES) },
             )
         }
+    }
+}
+
+/** Cabecera grande reutilizada por álbumes y lugares. */
+@Composable
+private fun CollectionScaffold(
+    title: String,
+    content: @Composable (topPadding: Dp) -> Unit,
+) {
+    Column(modifier = Modifier.statusBarsPadding()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp),
+        )
+        content(8.dp)
+    }
+}
+
+private fun NavHostController.switchTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.startDestinationId) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

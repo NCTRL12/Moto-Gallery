@@ -1,55 +1,64 @@
 package com.nctrl.motogallery.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-
-private val Purple = Color(0xFF6C4CE0)
-private val PurpleLight = Color(0xFFCFBCFF)
-private val Amber = Color(0xFFFFB300)
 
 private val LightColors = lightColorScheme(
-    primary = Purple,
-    secondary = Color(0xFF615B71),
-    tertiary = Amber,
-    background = Color(0xFFFCFAFF),
-    surface = Color(0xFFFCFAFF),
+    primary = OneUi.Blue,
+    onPrimary = OneUi.LightSurface,
+    primaryContainer = OneUi.Blue.copy(alpha = 0.12f),
+    onPrimaryContainer = OneUi.BluePressed,
+    secondary = OneUi.Blue,
+    tertiary = OneUi.Coral,
+    background = OneUi.LightBackground,
+    onBackground = OneUi.LightOnSurface,
+    surface = OneUi.LightSurface,
+    onSurface = OneUi.LightOnSurface,
+    surfaceVariant = OneUi.LightSurfaceVariant,
+    onSurfaceVariant = OneUi.LightOnSurfaceVariant,
+    surfaceContainer = OneUi.LightSurface,
+    surfaceContainerHigh = OneUi.LightSurfaceVariant,
+    outline = OneUi.LightOutline,
+    outlineVariant = OneUi.LightOutline,
+    error = OneUi.Coral,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = PurpleLight,
-    secondary = Color(0xFFCBC2DB),
-    tertiary = Amber,
-    background = Color(0xFF101014),
-    surface = Color(0xFF16161C),
+    primary = OneUi.BlueDark,
+    onPrimary = OneUi.DarkBackground,
+    primaryContainer = OneUi.BlueDark.copy(alpha = 0.18f),
+    onPrimaryContainer = OneUi.BlueDark,
+    secondary = OneUi.BlueDark,
+    tertiary = OneUi.Coral,
+    background = OneUi.DarkBackground,
+    onBackground = OneUi.DarkOnSurface,
+    surface = OneUi.DarkSurface,
+    onSurface = OneUi.DarkOnSurface,
+    surfaceVariant = OneUi.DarkSurfaceVariant,
+    onSurfaceVariant = OneUi.DarkOnSurfaceVariant,
+    surfaceContainer = OneUi.DarkSurface,
+    surfaceContainerHigh = OneUi.DarkSurfaceVariant,
+    outline = OneUi.DarkOutline,
+    outlineVariant = OneUi.DarkOutline,
+    error = OneUi.Coral,
 )
 
+/**
+ * Tema fijo a propósito: los colores dinámicos de Material You romperían el
+ * aspecto One UI, que siempre usa el azul de Samsung sobre gris claro o negro.
+ */
 @Composable
 fun MotoGalleryTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    // Android 12+ tiene colores dinámicos: la galería combina con el fondo de pantalla.
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-
     MaterialTheme(
-        colorScheme = colors,
-        typography = Typography(),
+        colorScheme = if (darkTheme) DarkColors else LightColors,
+        typography = OneUiTypography,
+        shapes = OneUiShapes,
         content = content,
     )
 }
