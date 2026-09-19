@@ -1,6 +1,7 @@
 package com.nctrl.motogallery.ui
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.fadeIn
@@ -36,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -57,6 +59,7 @@ import com.nctrl.motogallery.data.MediaItem
 import com.nctrl.motogallery.ui.components.OneUiChip
 import com.nctrl.motogallery.ui.components.OneUiSearchField
 import com.nctrl.motogallery.ui.screens.AlbumsGrid
+import com.nctrl.motogallery.ui.screens.EditorScreen
 import com.nctrl.motogallery.ui.screens.MediaGridScreen
 import com.nctrl.motogallery.ui.screens.PermissionScreen
 import com.nctrl.motogallery.ui.screens.PlacesGrid
@@ -74,6 +77,7 @@ private object Routes {
     const val FAVORITES = "favorites"
     const val SEARCH = "search"
     const val TRASH = "trash"
+    const val EDITOR = "edit/{uri}"
     const val ALBUM_DETAIL = "album/{albumId}"
     const val PLACE_DETAIL = "place/{place}"
     const val VIEWER = "viewer/{source}/{index}"
@@ -81,6 +85,7 @@ private object Routes {
     fun album(albumId: Long) = "album/$albumId"
     fun place(name: String) = "place/${Uri.encode(name)}"
     fun viewer(source: String, index: Int) = "viewer/${Uri.encode(source)}/$index"
+    fun editor(uri: Uri) = "edit/${Uri.encode(uri.toString())}"
 }
 
 private data class Tab(val route: String, val labelRes: Int, val icon: ImageVector)
@@ -317,6 +322,33 @@ private fun GalleryNavigation(
                 )
             }
 
+            composable(
+                route = Routes.EDITOR,
+                arguments = listOf(navArgument("uri") { type = NavType.StringType }),
+            ) { entry ->
+                val raw = entry.arguments?.getString("uri").orEmpty()
+                val uri = remember(raw) { Uri.parse(raw) }
+                val name = remember(raw, state.items) {
+                    state.items.firstOrNull { it.uri.toString() == raw }?.name ?: "IMG"
+                }
+                val context = LocalContext.current
+                val savedMessage = stringResource(R.string.editor_saved)
+
+                EditorScreen(
+                    uri = uri,
+                    sourceName = name,
+                    viewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+                    onClose = { navController.popBackStack() },
+                    onSaved = {
+                        Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
+                        // La copia nueva entra por el ContentObserver, pero se
+                        // fuerza la recarga para verla nada más volver.
+                        viewModel.refresh()
+                        navController.popBackStack()
+                    },
+                )
+            }
+
             composable(Routes.SEARCH) {
                 SearchScreen(
                     state = searchState,
@@ -358,6 +390,11 @@ private fun GalleryNavigation(
                     // Lo que ya está en la papelera no puede volver a tirarse.
                     onDelete = if (source == "trash") actions.deleteForever else actions.trash,
                     onBack = { navController.popBackStack() },
+                    onEdit = if (source == "trash") {
+                        null
+                    } else {
+                        { item -> navController.navigate(Routes.editor(item.uri)) }
+                    },
                 )
             }
         }

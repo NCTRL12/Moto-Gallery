@@ -22,6 +22,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
@@ -67,6 +68,7 @@ fun ViewerScreen(
     onToggleFavorite: (MediaItem) -> Unit,
     onDelete: (List<MediaItem>) -> Unit,
     onBack: () -> Unit,
+    onEdit: ((MediaItem) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onBack() }
@@ -248,6 +250,17 @@ fun ViewerScreen(
                     background = ButtonScrim,
                     modifier = Modifier.scale(heartScale),
                 )
+
+                // Editar solo tiene sentido en fotos: los vídeos no se tocan.
+                if (onEdit != null && current?.isVideo == false) {
+                    CircleIconButton(
+                        icon = Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.action_edit),
+                        onClick = { onEdit(current) },
+                        tint = Color.White,
+                        background = ButtonScrim,
+                    )
+                }
 
                 CircleIconButton(
                     icon = Icons.Default.Info,
