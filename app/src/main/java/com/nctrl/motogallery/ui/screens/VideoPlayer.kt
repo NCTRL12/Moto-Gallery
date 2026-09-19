@@ -53,9 +53,9 @@ fun VideoPlayer(
     AndroidView(
         factory = { viewContext ->
             PlayerView(viewContext).apply {
-                this.player = player
-                useController = true
-                controllerAutoShow = false
+                setPlayer(player)
+                setUseController(true)
+                setControllerAutoShow(false)
                 setShowNextButton(false)
                 setShowPreviousButton(false)
                 setBackgroundColor(android.graphics.Color.BLACK)
@@ -65,7 +65,7 @@ fun VideoPlayer(
         update = { view ->
             if (showControls) view.showController() else view.hideController()
         },
-        onRelease = { view -> view.player = null },
+        onRelease = { view -> view.setPlayer(null) },
         modifier = modifier.fillMaxSize(),
     )
 }
