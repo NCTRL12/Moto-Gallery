@@ -67,6 +67,7 @@ import com.nctrl.motogallery.ui.screens.SearchScreen
 import com.nctrl.motogallery.ui.screens.TrashScreen
 import com.nctrl.motogallery.ui.screens.ViewerScreen
 import com.nctrl.motogallery.ui.theme.Motion
+import com.nctrl.motogallery.util.DateGrouping
 import com.nctrl.motogallery.util.MediaAccess
 import com.nctrl.motogallery.util.Permissions
 
@@ -208,10 +209,13 @@ private fun GalleryNavigation(
                     onOpen = { navController.navigate(Routes.viewer("home", it)) },
                     onDelete = actions.trash,
                     onToggleFavorite = viewModel::toggleFavorite,
+                    grouping = state.grouping,
                     header = {
                         HomeHeader(
                             filter = state.filter,
+                            grouping = state.grouping,
                             onFilterChange = viewModel::setFilter,
+                            onGroupingChange = viewModel::setGrouping,
                             onSearchClick = { navController.navigate(Routes.SEARCH) },
                         )
                     },
@@ -420,7 +424,9 @@ private fun GalleryNavigation(
 @Composable
 private fun HomeHeader(
     filter: MediaFilter,
+    grouping: DateGrouping,
     onFilterChange: (MediaFilter) -> Unit,
+    onGroupingChange: (DateGrouping) -> Unit,
     onSearchClick: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 10.dp)) {
@@ -428,11 +434,43 @@ private fun HomeHeader(
             placeholder = stringResource(R.string.search_hint),
             onClick = onSearchClick,
         )
+
+        // Cómo se agrupan las secciones de la rejilla.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.group_by),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 2.dp),
+            )
+            OneUiChip(
+                label = stringResource(R.string.group_day),
+                selected = grouping == DateGrouping.DAY,
+                onClick = { onGroupingChange(DateGrouping.DAY) },
+            )
+            OneUiChip(
+                label = stringResource(R.string.group_month),
+                selected = grouping == DateGrouping.MONTH,
+                onClick = { onGroupingChange(DateGrouping.MONTH) },
+            )
+            OneUiChip(
+                label = stringResource(R.string.group_year),
+                selected = grouping == DateGrouping.YEAR,
+                onClick = { onGroupingChange(DateGrouping.YEAR) },
+            )
+        }
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 2.dp),
+                .padding(top = 10.dp, bottom = 2.dp),
         ) {
             OneUiChip(
                 label = stringResource(R.string.filter_all),

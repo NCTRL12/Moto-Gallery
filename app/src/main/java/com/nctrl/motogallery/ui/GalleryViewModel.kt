@@ -12,6 +12,7 @@ import com.nctrl.motogallery.data.Place
 import com.nctrl.motogallery.data.SearchIndex
 import com.nctrl.motogallery.data.SearchSuggestion
 import com.nctrl.motogallery.data.toAlbums
+import com.nctrl.motogallery.util.DateGrouping
 import com.nctrl.motogallery.util.MediaAccess
 import com.nctrl.motogallery.util.Permissions
 import com.nctrl.motogallery.util.TrashOperation
@@ -40,6 +41,8 @@ data class GalleryUiState(
     val placeGroups: List<Place> = emptyList(),
     val indexingPlaces: Boolean = false,
     val filter: MediaFilter = MediaFilter.ALL,
+    /** Si las fotos se separan por día, por mes o por año. */
+    val grouping: DateGrouping = DateGrouping.DAY,
     /** Contenido de la papelera del sistema (Android 11+). */
     val trashed: List<MediaItem> = emptyList(),
 ) {
@@ -222,6 +225,8 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setFilter(filter: MediaFilter) = _state.update { it.copy(filter = filter) }
+
+    fun setGrouping(grouping: DateGrouping) = _state.update { it.copy(grouping = grouping) }
 
     fun toggleFavorite(item: MediaItem) {
         _state.update { current ->

@@ -1,6 +1,7 @@
 package com.nctrl.motogallery.util
 
 import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -37,17 +38,40 @@ fun formatDateTime(millis: Long): String {
     return format.format(Date(millis))
 }
 
-/** Cabecera de sección del grid: "12 de marzo de 2025". */
-fun formatDayHeader(millis: Long): String {
-    if (millis <= 0) return "—"
-    return DateFormat.getDateInstance(DateFormat.LONG).format(Date(millis))
-}
+/** Cómo se reparten las fotos en secciones dentro de la rejilla. */
+enum class DateGrouping { DAY, MONTH, YEAR }
 
-/** Todos los elementos del mismo día (hora local) comparten esta clave. */
-fun dayKey(millis: Long): Long {
+/** Clave de sección según la agrupación elegida. */
+fun groupKey(millis: Long, grouping: DateGrouping): Long {
     val calendar = Calendar.getInstance()
     calendar.timeInMillis = millis
-    return calendar.get(Calendar.YEAR) * 1000L + calendar.get(Calendar.DAY_OF_YEAR)
+    val year = calendar.get(Calendar.YEAR)
+    return when (grouping) {
+        DateGrouping.DAY -> year * 1000L + calendar.get(Calendar.DAY_OF_YEAR)
+        DateGrouping.MONTH -> year * 100L + calendar.get(Calendar.MONTH)
+        DateGrouping.YEAR -> year.toLong()
+    }
+}
+
+/** Título de la sección: "12 de marzo de 2025", "Marzo de 2025" o "2025". */
+fun groupHeader(millis: Long, grouping: DateGrouping): String {
+    if (millis <= 0) return "—"
+    val date = Date(millis)
+    return when (grouping) {
+        DateGrouping.DAY -> DateFormat.getDateInstance(DateFormat.LONG).format(date)
+        DateGrouping.MONTH -> localized("MMMM y", date).replaceFirstChar { it.uppercase() }
+        DateGrouping.YEAR -> localized("y", date)
+    }
+}
+
+/** Usa el orden de fecha propio del idioma del teléfono. */
+private fun localized(skeleton: String, date: Date): String {
+    val locale = Locale.getDefault()
+    val pattern = runCatching {
+        android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton)
+    }.getOrNull() ?: skeleton
+    return runCatching { SimpleDateFormat(pattern, locale).format(date) }
+        .getOrDefault(SimpleDateFormat(skeleton, locale).format(date))
 }
 
 /** Días que faltan para que Android borre solo un elemento de la papelera. */

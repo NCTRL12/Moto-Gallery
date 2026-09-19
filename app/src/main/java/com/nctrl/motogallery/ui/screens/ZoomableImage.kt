@@ -1,8 +1,12 @@
 package com.nctrl.motogallery.ui.screens
 
+import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
@@ -23,14 +28,18 @@ import kotlin.math.max
 private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 6f
 private const val DOUBLE_TAP_SCALE = 2.5f
+private const val ZOOM_THRESHOLD = 1.01f
 
 /**
  * Foto a pantalla completa con pellizco para ampliar, arrastre y doble toque.
- * Avisa al pager con [onZoomChanged] para que no robe el gesto mientras hay zoom.
+ *
+ * Con un solo dedo y sin zoom el gesto NO se consume: así el deslizamiento
+ * llega al carrusel y se pasa de foto. En cuanto hay dos dedos o la imagen
+ * está ampliada, el gesto pasa a ser de la imagen.
  */
 @Composable
 fun ZoomableImage(
-    uri: android.net.Uri,
+    uri: Uri,
     isCurrentPage: Boolean,
     onTap: () -> Unit,
     onZoomChanged: (Boolean) -> Unit,
@@ -49,7 +58,7 @@ fun ZoomableImage(
         }
     }
 
-    LaunchedEffect(scale) { onZoomChanged(scale > 1.01f) }
+    LaunchedEffect(scale) { onZoomChanged(scale > ZOOM_THRESHOLD) }
 
     val animatedScale by animateFloatAsState(targetValue = scale, label = "scale")
 
@@ -76,7 +85,7 @@ fun ZoomableImage(
                     detectTapGestures(
                         onTap = { onTap() },
                         onDoubleTap = { tap ->
-                            if (scale > 1.01f) {
+                            if (scale > ZOOM_THRESHOLD) {
                                 scale = 1f
                                 offsetX = 0f
                                 offsetY = 0f
@@ -94,16 +103,33 @@ fun ZoomableImage(
                     )
                 }
                 .pointerInput(uri) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        val next = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
-                        scale = next
-                        if (next <= 1.01f) {
-                            offsetX = 0f
-                            offsetY = 0f
-                        } else {
-                            offsetX = (offsetX + pan.x * next).coerceIn(-maxX(next), maxX(next))
-                            offsetY = (offsetY + pan.y * next).coerceIn(-maxY(next), maxY(next))
-                        }
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val pointers = event.changes.count { it.pressed }
+                            val isPinch = pointers > 1
+                            val isZoomed = scale > ZOOM_THRESHOLD
+
+                            if (isPinch || isZoomed) {
+                                val next = (scale * event.calculateZoom())
+                                    .coerceIn(MIN_SCALE, MAX_SCALE)
+                                val pan = event.calculatePan()
+                                scale = next
+
+                                if (next <= ZOOM_THRESHOLD) {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                } else {
+                                    offsetX = (offsetX + pan.x)
+                                        .coerceIn(-maxX(next), maxX(next))
+                                    offsetY = (offsetY + pan.y)
+                                        .coerceIn(-maxY(next), maxY(next))
+                                }
+
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
                     }
                 },
         )

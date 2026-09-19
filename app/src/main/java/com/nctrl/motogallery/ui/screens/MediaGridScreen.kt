@@ -49,6 +49,7 @@ import com.nctrl.motogallery.R
 import com.nctrl.motogallery.data.MediaItem
 import com.nctrl.motogallery.ui.components.CircleIconButton
 import com.nctrl.motogallery.ui.theme.Motion
+import com.nctrl.motogallery.util.DateGrouping
 import com.nctrl.motogallery.util.MediaActions
 
 /**
@@ -72,6 +73,7 @@ fun MediaGridScreen(
     onSearch: (() -> Unit)? = null,
     partialAccess: Boolean = false,
     onSelectMorePhotos: () -> Unit = {},
+    grouping: DateGrouping = DateGrouping.DAY,
     header: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -209,6 +211,7 @@ fun MediaGridScreen(
                         }
                     },
                     onLongClick = { item -> selectedKeys = selectedKeys.toggle(item.key) },
+                    grouping = grouping,
                     header = gridHeader,
                 )
             }

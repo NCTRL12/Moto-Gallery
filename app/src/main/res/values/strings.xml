@@ -17,6 +17,11 @@
     <string name="empty_places">Ninguna foto guarda todavía su ubicación</string>
     <string name="places_hint">Se lee del propio archivo, sin conexión a internet</string>
 
+    <string name="group_by">Agrupar:</string>
+    <string name="group_day">Día</string>
+    <string name="group_month">Mes</string>
+    <string name="group_year">Año</string>
+
     <string name="filter_all">Todo</string>
     <string name="filter_photos">Fotos</string>
     <string name="filter_videos">Vídeos</string>

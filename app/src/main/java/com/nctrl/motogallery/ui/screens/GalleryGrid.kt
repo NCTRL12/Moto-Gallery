@@ -51,8 +51,9 @@ import coil.request.ImageRequest
 import coil.size.Scale
 import com.nctrl.motogallery.data.MediaItem
 import com.nctrl.motogallery.ui.theme.Motion
-import com.nctrl.motogallery.util.dayKey
-import com.nctrl.motogallery.util.formatDayHeader
+import com.nctrl.motogallery.util.DateGrouping
+import com.nctrl.motogallery.util.groupHeader
+import com.nctrl.motogallery.util.groupKey
 import com.nctrl.motogallery.util.formatDuration
 
 /**
@@ -72,12 +73,13 @@ fun GalleryGrid(
     modifier: Modifier = Modifier,
     state: LazyGridState = rememberLazyGridState(),
     groupByDay: Boolean = true,
+    grouping: DateGrouping = DateGrouping.DAY,
     header: (@Composable () -> Unit)? = null,
 ) {
     // Agrupar miles de fotos en cada recomposición provoca tirones al
     // seleccionar o marcar favoritos: se calcula una vez por lista.
-    val groups = remember(items, groupByDay) {
-        if (groupByDay) items.groupBy { dayKey(it.dateTaken) } else emptyMap()
+    val groups = remember(items, groupByDay, grouping) {
+        if (groupByDay) items.groupBy { groupKey(it.dateTaken, grouping) } else emptyMap()
     }
 
     LazyVerticalGrid(
@@ -96,7 +98,7 @@ fun GalleryGrid(
             groups.forEach { (day, dayItems) ->
                 item(key = "day-$day", span = { GridItemSpan(maxLineSpan) }) {
                     Text(
-                        text = formatDayHeader(dayItems.first().dateTaken),
+                        text = groupHeader(dayItems.first().dateTaken, grouping),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
